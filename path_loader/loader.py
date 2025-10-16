@@ -10,30 +10,44 @@ from pathlib import Path
 from typing import Optional, List
 
 
-# 支援的配置檔名稱(優先順序由高到低)
-CONFIG_NAMES = [".pypath", "pythonpath.txt", "sys_paths.conf"]
+# 預設配置檔名稱 (只用於手動呼叫時的預設值)
+# 自動載入(.pth)只會搜尋 .pypath
+CONFIG_NAMES = [".pypath"]
 
 
-def find_pypath_file(start_dir: Optional[str] = None) -> Optional[Path]:
+def find_pypath_file(
+    start_dir: Optional[str] = None, config_names: Optional[List[str]] = None
+) -> Optional[Path]:
     """
     從指定目錄開始向上搜尋配置檔
 
-    會依序搜尋以下檔案名稱:
-    - .pypath (推薦)
-    - pythonpath.txt
-    - sys_paths.conf
+    會依序搜尋指定的檔案名稱,找到第一個就回傳。
 
     Args:
         start_dir: 起始搜尋目錄,若為 None 則從當前工作目錄開始
+        config_names: 要搜尋的檔名列表,若為 None 則只搜尋 '.pypath'
 
     Returns:
         找到的配置檔路徑,若找不到則回傳 None
 
     Examples:
+        >>> # 使用預設檔名 (.pypath)
         >>> config = find_pypath_file()
         >>> if config:
         ...     print(f"找到配置檔: {config}")
+
+        >>> # 搜尋自訂檔名
+        >>> config = find_pypath_file(config_names=['my_paths.conf'])
+
+        >>> # 從特定目錄開始搜尋
+        >>> config = find_pypath_file(start_dir='/project/root')
+
+        >>> # 搜尋多個檔名
+        >>> config = find_pypath_file(config_names=['dev.conf', '.pypath', 'prod.conf'])
     """
+    if config_names is None:
+        config_names = CONFIG_NAMES
+
     if start_dir is None:
         start_dir = Path.cwd()
     else:
@@ -43,7 +57,7 @@ def find_pypath_file(start_dir: Optional[str] = None) -> Optional[Path]:
 
     # 向上搜尋直到根目錄
     while True:
-        for config_name in CONFIG_NAMES:
+        for config_name in config_names:
             config_path = current / config_name
             if config_path.exists() and config_path.is_file():
                 return config_path
@@ -72,6 +86,12 @@ def parse_pypath_file(config_path: Path) -> List[str]:
 
     Returns:
         解析出的有效路徑列表
+
+    Examples:
+        >>> config = find_pypath_file()
+        >>> if config:
+        ...     paths = parse_pypath_file(config)
+        ...     print(f"找到 {len(paths)} 個路徑")
     """
     paths = []
     config_dir = config_path.parent
@@ -102,18 +122,41 @@ def parse_pypath_file(config_path: Path) -> List[str]:
     return paths
 
 
-def load_paths(start_dir: Optional[str] = None, prepend: bool = False) -> int:
+def load_paths(
+    start_dir: Optional[str] = None,
+    config_names: Optional[List[str]] = None,
+) -> int:
     """
     搜尋並載入配置檔中的路徑到 sys.path
 
     Args:
         start_dir: 起始搜尋目錄,若為 None 則從當前工作目錄開始
-        prepend: False(預設)=使用 append, True=使用 insert(0)
+        config_names: 自訂要搜尋的配置檔名稱列表,若為 None 則只搜尋 '.pypath'
 
     Returns:
         成功載入的路徑數量
+
+    Examples:
+        >>> # 基本使用 (只搜尋 .pypath)
+        >>> count = load_paths()
+        >>> print(f"載入了 {count} 個路徑")
+
+        >>> # 搜尋自訂配置檔名
+        >>> load_paths(config_names=['my_paths.conf'])
+
+        >>> # 搜尋多個配置檔 (找到第一個就停止)
+        >>> load_paths(config_names=['dev.conf', '.pypath', 'prod.conf'])
+
+        >>> # 從特定目錄搜尋
+        >>> load_paths(start_dir='/project/root')
+
+        >>> # 組合使用
+        >>> load_paths(
+        ...     start_dir='/my/project',
+        ...     config_names=['dev_paths.txt', '.pypath']
+        ... )
     """
-    config_path = find_pypath_file(start_dir)
+    config_path = find_pypath_file(start_dir, config_names)
 
     if not config_path:
         return 0
@@ -123,10 +166,7 @@ def load_paths(start_dir: Optional[str] = None, prepend: bool = False) -> int:
 
     for path in paths:
         if path not in sys.path:
-            if prepend:
-                sys.path.insert(0, path)
-            else:
-                sys.path.append(path)
+            sys.path.insert(1, path)
             loaded_count += 1
 
     return loaded_count
