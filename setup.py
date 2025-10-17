@@ -84,7 +84,7 @@ def create_pth_file():
         with open(pth_file, "w", encoding="utf-8") as f:
             f.write(PTH_CONTENT)
         print(f"\n✓ 成功建立 .pth 檔案: {pth_file}")
-        print(f"   Python 啟動時會自動搜尋並載入 .pypath 配置檔")
+        print("   Python 啟動時會自動搜尋並載入 .pypath 配置檔")
         return True
     except Exception as e:
         print(f"\n✗ 警告: 無法建立 .pth 檔案: {e}")
